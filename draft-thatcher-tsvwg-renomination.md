@@ -1,7 +1,7 @@
 ---
 title: "ICE Renomination: Dynamically selecting ICE candidate pairs"
 abbrev: ICE Renomination
-docname: draft-thatcher-tsvwg-renomination-00
+docname: draft-thatcher-tsvwg-renomination-latest
 submissiontype: IETF
 number:
 date: 2026-04-06
