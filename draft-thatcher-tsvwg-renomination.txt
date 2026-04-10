@@ -1,0 +1,365 @@
+
+
+
+
+Transport and Services Working Group                         P. Thatcher
+Internet-Draft                                                    Google
+Intended status: Standards Track                                H. Zhang
+Expires: 8 October 2026                                                 
+                                                         T. Brandstetter
+                                                                  Google
+                                                               J. Uberti
+                                                                  OpenAI
+                                                            6 April 2026
+
+
+      ICE Renomination: Dynamically selecting ICE candidate pairs
+                draft-thatcher-tsvwg-renomination-latest
+
+Abstract
+
+   This document describes an extension to the Interactive Connectivity
+   Establishment (ICE) that enables the controlling ICE agent to
+   dynamically change its selected candidate pair over time as network
+   conditions change, and notify the controlled side accordingly.
+
+About This Document
+
+   This note is to be removed before publishing as an RFC.
+
+   Status information for this document may be found at
+   https://datatracker.ietf.org/doc/draft-thatcher-tsvwg-renomination/.
+
+   Discussion of this document takes place on the tsvwg Working Group
+   mailing list (mailto:tsvwg@ietf.org), which is archived at
+   https://datatracker.ietf.org/wg/tsvwg/.  Subscribe at
+   https://www.ietf.org/mailman/listinfo/tsvwg/.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 8 October 2026.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Terminology
+   3.  Design
+     3.1.  Behavior
+     3.2.  ICE Option
+     3.3.  "Nomination" attribute
+   4.  Interaction with ICE Lite
+   5.  IANA Considerations
+     5.1.  ICE Option Registration
+     5.2.  STUN Attribute Registration
+   6.  Security Considerations
+   7.  Acknowledgements
+   8.  References
+     8.1.  Normative References
+     8.2.  Informative References
+   Authors' Addresses
+
+1.  Introduction
+
+   ICE [RFC8445] agents take either the controlling or controlled role.
+   During the ICE establishment process, the controlling and controlled
+   agents communicate, using either regular or aggressive nomination, to
+   agree upon which candidate pair they will use to exchange traffic.
+   However, once ICE is established, there is no defined procedure for
+   changing the selected pair without using an ICE restart.
+
+   While the controlling ICE agent could unilaterally select a given
+   candidate pair at any time, it has no straightforward way of
+   authoritatively telling the controlled side what pair it has
+   selected.  This greatly limits the controlling side's options.
+
+   For example, if an ICE agent selects and nominates a candidate pair
+   over a cellular network, and then later connects to a Wi-Fi network
+   and trickles ICE candidates for the Wi-Fi network, it may wish to
+   select and nominate a Wi-Fi candidate pair.  If soon thereafter the
+   Wi-Fi network disconnects, the ICE agent may wish to select and
+   nominate the cellular candidate pair again.  These sorts of mid-
+   session changes to the selected pair are not possible under the
+   current ICE procedures without an ICE restart.
+
+   This document continues the work from the earlier individual
+   Internet-Draft [I-D.thatcher-ice-renomination].
+
+2.  Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in BCP
+   14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+3.  Design
+
+   This document defines an extension to the ICE mechanism called
+   renomination.  When active, renomination allows the controlling side
+   to dynamically change the selected pair at any time, and notify the
+   controlled side which pair it should use.
+
+   This allows switching between known pairs, or, as in the scenario
+   outlined above, if a new interface becomes available, the controlling
+   side can switch to a pair where the local candidate is on the new
+   interface.
+
+   While this sort of dynamic change could be achieved with an ICE
+   restart, a restart is a somewhat heavy operation that involves
+   signaling new ICE credentials, gathering new candidates on both
+   sides, and running the connectivity check mechanism for a whole new
+   set of candidate pairs.  In particular, the signaling requirement can
+   be especially problematic if the device is in the process of
+   switching between networks.
+
+   In contrast, the renomination mechanism only requires the exchange of
+   a single ICE connectivity check.
+
+   As with regular nomination, this specification does not prescribe a
+   specific algorithm for the controlling agent to select a candidate
+   pair.
+
+3.1.  Behavior
+
+   When renomination is active, the controlled side follows a process
+   similar to regular nomination, except that more than one nomination
+   request carrying USE-CANDIDATE can be sent during the lifetime of the
+   ICE session, and the last valid nomination wins.  To avoid ambiguity
+   if requests are received out of order, a new NOMINATION attribute
+   (Section 3.3) MUST be included in every connectivity check that
+   contains USE-CANDIDATE.  The value of the NOMINATION attribute is a
+   monotonically increasing sequence number chosen by the controlling
+   agent.  A nomination request whose NOMINATION value is less than or
+   equal to the highest previously accepted NOMINATION value for the
+   same ICE generation and component MUST be ignored.
+
+   In order to ensure that candidate pairs other than the selected pair
+   remain usable, both sides need to keep their candidates alive (e.g.,
+   by refreshing an associated TURN allocation).  In addition, the
+   controlling side MUST periodically send ICE consent checks on any
+   candidate pair it wants to keep available for future nomination,
+   using the consent freshness mechanism defined in [RFC7675].  The
+   controlled side MUST issue a success response to these checks for all
+   candidate pairs it intends to keep available for future nomination.
+   However, either agent MAY limit the number and type of retained
+   candidate pairs according to local policy.
+
+   This allows the controlling side to maintain a set of valid candidate
+   pairs, any one of which it can nominate at any time.
+
+3.2.  ICE Option
+
+   Naturally, this mechanism requires opt-in from both ICE agents.  To
+   accomplish this, we define a new ICE option called "renomination2",
+   where the "2" is added to avoid ambiguities with earlier versions of
+   this draft.
+
+   If one side signals "renomination2" and the other does not,
+   renomination is not in use for that ICE session.  In that case, the
+   controlling side MUST use standard ICE nomination procedures and MUST
+   NOT send more than one effective nomination for a given component.
+
+   Note that the offering side (typically, the controlling side, but not
+   always, e.g., if the offerer is ICE Lite) MAY receive ICE checks
+   prior to receiving the SDP answer that definitively indicates support
+   for renomination.  In this case, the ICE checks might or might not
+   include the NOMINATION attribute defined below.  Accordingly, when
+   offering "renomination2" and operating in the controlled role, the
+   offerer MUST be prepared to work with an answerer that is using
+   either renomination or regular nomination.
+
+3.3.  "Nomination" attribute
+
+   To deal with out-of-order delivery of nominations, this document
+   defines a new STUN attribute [RFC8489], NOMINATION, which carries a
+   32-bit unsigned integer in network byte order.  This attribute is
+   comprehension-required, as it is only used when both sides have
+   explicitly negotiated support via the "renomination2" ICE option.
+
+   When the "renomination2" ICE option has been negotiated, the
+   controlling side MUST include a NOMINATION attribute in every
+   connectivity check that includes USE-CANDIDATE.  The first such
+   request for an ICE generation (i.e., for a given set of ICE
+   credentials) and component MAY use any value.  Subsequent nomination
+   requests for that same ICE generation and component MUST use a
+   strictly greater value than any prior nomination request sent for
+   that component.  NOMINATION values for different components are not
+   compared.
+
+   The controlled side MUST compare the received NOMINATION value
+   against the highest previously accepted NOMINATION value for the
+   current ICE generation and component.  If the received value is
+   greater, the nomination is accepted and the nominated pair is updated
+   for that component.  If the received value is less than or equal to
+   the stored value, the request MUST be ignored for the purpose of
+   updating the nominated pair.  If the NOMINATION attribute is absent,
+   the request MUST be similarly ignored, unless the scenario noted in
+   Section 3.2 applies, where the SDP answer has not yet arrived and it
+   is currently unclear to the offerer whether regular nomination or
+   renomination is in use.  In this situation, a connectivity check with
+   USE-CANDIDATE but no NOMINATION attribute MUST be processed as a
+   regular nomination.
+
+   If the ICE credentials are changed, i.e., by an ICE restart, this
+   constitutes a new ICE generation, and the first-request rules above
+   apply for each component.
+
+4.  Interaction with ICE Lite
+
+   Renomination is compatible with both full ICE and ICE Lite.  When
+   using ICE Lite, the guidance in [RFC8445] for the controlling side to
+   select the candidate pair with the highest priority is superseded by
+   the mechanism described above.
+
+5.  IANA Considerations
+
+   This document requests that IANA make the following registrations:
+
+5.1.  ICE Option Registration
+
+   IANA is requested to add the following value to the "Interactive
+   Connectivity Establishment (ICE) Options" registry:
+
+   ICE Option name: renomination2 Description: The ICE option indicates
+   that the ICE agent supports renomination.  Reference: RFC XXXX
+
+5.2.  STUN Attribute Registration
+
+   IANA is requested to add the following value to the "STUN Attributes"
+   registry:
+
+   Attribute Name: NOMINATION Value: 0x0030 Reference: RFC XXXX
+
+   Note: Some implementations have already used 0x0030 for this
+   attribute, and IANA has confirmed that this codepoint is available
+   for registration by this specification.
+
+6.  Security Considerations
+
+   This mechanism extends the period during which ICE nomination can
+   occur.  Although it does not introduce any significant new protocol
+   surface, it will result in continued connectivity checks on non-
+   selected candidate pairs.
+
+   The existing consent freshness mechanism defined in [RFC7675] is used
+   to ensure that the controlling side has permission to continue
+   sending checks to these non-selected candidate pairs.
+
+   However, keeping certain candidates alive may incur higher power and
+   network usage (e.g., cellular or TURN candidates).  To control this,
+   either side MAY discard candidates that it considers non-essential.
+
+   This extension does not change the existing requirements for
+   authenticating STUN checks or protecting application or media traffic
+   sent over candidate pairs.
+
+7.  Acknowledgements
+
+   This document overlaps with similar ideas in
+   [I-D.uberti-mmusic-nombis] and [I-D.oreland-dispatch-ice-nicer].
+
+8.  References
+
+8.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC7675]  Perumal, M., Wing, D., Ravindranath, R., Reddy, T., and M.
+              Thomson, "Session Traversal Utilities for NAT (STUN) Usage
+              for Consent Freshness", RFC 7675, DOI 10.17487/RFC7675,
+              October 2015, <https://www.rfc-editor.org/rfc/rfc7675>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC8445]  Keranen, A., Holmberg, C., and J. Rosenberg, "Interactive
+              Connectivity Establishment (ICE): A Protocol for Network
+              Address Translator (NAT) Traversal", RFC 8445,
+              DOI 10.17487/RFC8445, July 2018,
+              <https://www.rfc-editor.org/rfc/rfc8445>.
+
+   [RFC8489]  Petit-Huguenin, M., Salgueiro, G., Rosenberg, J., Wing,
+              D., Mahy, R., and P. Matthews, "Session Traversal
+              Utilities for NAT (STUN)", RFC 8489, DOI 10.17487/RFC8489,
+              February 2020, <https://www.rfc-editor.org/rfc/rfc8489>.
+
+8.2.  Informative References
+
+   [I-D.oreland-dispatch-ice-nicer]
+              Oreland, J. and H. T. Alvestrand, "NICER - a better usage
+              profile on ICE", Work in Progress, Internet-Draft, draft-
+              oreland-dispatch-ice-nicer-00, 6 July 2021,
+              <https://datatracker.ietf.org/doc/html/draft-oreland-
+              dispatch-ice-nicer-00>.
+
+   [I-D.thatcher-ice-renomination]
+              Thatcher, P., Zhang, H., and T. Brandstetter, "ICE
+              Renomination: Dynamically selecting ICE candidate pairs",
+              Work in Progress, Internet-Draft, draft-thatcher-ice-
+              renomination-01, 19 September 2016,
+              <https://datatracker.ietf.org/doc/html/draft-thatcher-ice-
+              renomination-01>.
+
+   [I-D.uberti-mmusic-nombis]
+              Uberti, J. and J. Lennox, "Improvements to ICE Candidate
+              Nomination", Work in Progress, Internet-Draft, draft-
+              uberti-mmusic-nombis-00, 9 March 2015,
+              <https://datatracker.ietf.org/doc/html/draft-uberti-
+              mmusic-nombis-00>.
+
+   [RFC8838]  Ivov, E., Uberti, J., and P. Saint-Andre, "Trickle ICE:
+              Incremental Provisioning of Candidates for the Interactive
+              Connectivity Establishment (ICE) Protocol", RFC 8838,
+              DOI 10.17487/RFC8838, January 2021,
+              <https://www.rfc-editor.org/rfc/rfc8838>.
+
+Authors' Addresses
+
+   Peter Thatcher
+   Google
+   Email: pthatcher@google.com
+
+
+   Honghai Zhang
+   Email: honghaiz@google.com
+
+
+   Taylor Brandstetter
+   Google
+   Email: deadbeef@google.com
+
+
+   Justin Uberti
+   OpenAI
+   Email: justin@uberti.name
