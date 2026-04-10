@@ -1,7 +1,7 @@
 ---
 title: "ICE Renomination: Dynamically selecting ICE candidate pairs"
 abbrev: ICE Renomination
-docname: draft-thatcher-tsvwg-ice-renomination-00
+docname: draft-thatcher-tsvwg-renomination-00
 submissiontype: IETF
 number:
 date: 2026-04-06
@@ -69,15 +69,15 @@ notify the controlled side accordingly.
 
 # Introduction
 
-ICE {{RFC8445}} agents take either the controlling or controlled role.  
+ICE {{RFC8445}} agents take either the controlling or controlled role.
 During the ICE establishment process, the controlling and controlled agents
-communicate, using either regular or aggressive nomination, to agree upon 
+communicate, using either regular or aggressive nomination, to agree upon
 which candidate pair they will use to exchange traffic. However, once ICE is
 established, there is no defined procedure for changing the selected pair
 without using an ICE restart.
 
 While the controlling ICE agent could unilaterally select a given candidate pair
-at any time, it has no straightforward way of authoritatively telling the 
+at any time, it has no straightforward way of authoritatively telling the
 controlled side what pair it has selected. This greatly limits the controlling
 side's options.
 
@@ -114,7 +114,7 @@ While this sort of dynamic change could be achieved with an ICE restart,
 a restart is a somewhat heavy operation that involves signaling new ICE
 credentials, gathering new candidates on both sides, and running the
 connectivity check mechanism for a whole new set of candidate pairs.
-In particular, the signaling requirement can be especially problematic if 
+In particular, the signaling requirement can be especially problematic if
 the device is in the process of switching between networks.
 
 In contrast, the renomination mechanism only requires the exchange of a single
@@ -129,7 +129,7 @@ When renomination is active, the controlled side follows a process similar to
 regular nomination, except that more than one nomination request carrying
 USE-CANDIDATE can be sent during the lifetime of the ICE session, and the last
 valid nomination wins. To avoid ambiguity if requests are received out
-of order, a new NOMINATION attribute {#attribute} MUST be included in every
+of order, a new NOMINATION attribute ({{attribute}}) MUST be included in every
 connectivity check that contains USE-CANDIDATE. The value of the NOMINATION
 attribute is a monotonically increasing sequence number chosen by the
 controlling agent. A nomination request whose NOMINATION value is less than or
@@ -146,14 +146,14 @@ checks for all candidate pairs it intends to keep available for future
 nomination. However, either agent MAY limit the number and type of retained candidate
 pairs according to local policy.
 
-This allows the controlling side to maintain a set of valid candidate pairs, 
-any one of which it can nominate at any time. 
+This allows the controlling side to maintain a set of valid candidate pairs,
+any one of which it can nominate at any time.
 
 ## ICE Option {#option}
 
 Naturally, this mechanism requires opt-in from both ICE agents. To accomplish this,
 we define a new ICE option called "renomination2", where the "2" is added to
-avoid ambiguities with earlier versions of this draft. 
+avoid ambiguities with earlier versions of this draft.
 
 If one side signals "renomination2" and the other does not, renomination is
 not in use for that ICE session. In that case, the controlling side MUST use
@@ -161,7 +161,7 @@ standard ICE nomination procedures and MUST NOT send more than one effective
 nomination for a given component.
 
 Note that the offering side (typically, the controlling side, but not always,
-e.g., if the offerer is ICE Lite) MAY receive ICE checks prior to receiving 
+e.g., if the offerer is ICE Lite) MAY receive ICE checks prior to receiving
 the SDP answer that definitively indicates support for renomination. In this case,
 the ICE checks might or might not include the NOMINATION attribute defined below.
 Accordingly, when offering "renomination2" and operating in the controlled role,
@@ -189,9 +189,9 @@ highest previously accepted NOMINATION value for the current ICE generation
 and component. If the received value is greater, the nomination is accepted
 and the nominated pair is updated for that component. If the received value
 is less than or equal to the stored value, the request MUST be ignored for
-the purpose of updating the nominated pair. If the NOMINATION attribute is 
-absent, the request MUST be similarly ignored, unless the scenario noted in 
-{{#option}} applies, where the SDP answer has not yet arrived and it is
+the purpose of updating the nominated pair. If the NOMINATION attribute is
+absent, the request MUST be similarly ignored, unless the scenario noted in
+{{option}} applies, where the SDP answer has not yet arrived and it is
 currently unclear to the offerer whether regular nomination or renomination
 is in use. In this situation, a connectivity check with USE-CANDIDATE but
 no NOMINATION attribute MUST be processed as a regular nomination.
@@ -235,14 +235,14 @@ specification.
 # Security Considerations
 
 This mechanism extends the period during which ICE nomination can occur.
-Although it does not introduce any significant new protocol surface, it will 
+Although it does not introduce any significant new protocol surface, it will
 result in continued connectivity checks on non-selected candidate pairs.
 
 The existing consent freshness mechanism defined in {{RFC7675}} is used to
 ensure that the controlling side has permission to continue sending checks to
 these non-selected candidate pairs.
 
-However, keeping certain candidates alive may incur higher power and network usage 
+However, keeping certain candidates alive may incur higher power and network usage
 (e.g., cellular or TURN candidates). To control this, either side MAY
 discard candidates that it considers non-essential.
 
