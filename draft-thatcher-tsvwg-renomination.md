@@ -216,16 +216,20 @@ IANA is requested to add the following value to the
 "Interactive Connectivity Establishment (ICE) Options" registry:
 
 ICE Option name: `renomination2`
+
 Description: The ICE option indicates that the ICE agent supports renomination.
+
 Reference: RFC XXXX
 
 ## STUN Attribute Registration
 
-IANA is requested to add the following value to the
+IANA is requested to add the following comprehension-required value to the
 "STUN Attributes" registry:
 
 Attribute Name: `NOMINATION`
+
 Value: `0x0030`
+
 Reference: RFC XXXX
 
 Note: Some implementations have already used `0x0030` for this attribute, and
